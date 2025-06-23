@@ -25,6 +25,10 @@ public class TableroFrame extends JFrame implements SocketObserver {
     private PrintWriter out;
     private JTextArea areaMensajes;
     private JLabel etiquetaFechaHora;
+    private JLabel etiquetaCronometro;
+    private int segundosTranscurridos = 0;
+    private Timer cronometro;
+
 
     public TableroFrame(Personaje personaje, List<Personaje> personajes, Socket socket, String nombreJugador, SocketListener listener) {
         this.socket = socket;
@@ -121,17 +125,50 @@ public class TableroFrame extends JFrame implements SocketObserver {
         fondo.add(gridPanel, BorderLayout.CENTER);
         fondo.add(crearPanelDerecho(areaMensajes), BorderLayout.EAST);
 
-        JPanel panelSuperior = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel panelSuperior = new JPanel(new BorderLayout());
         panelSuperior.setOpaque(false);
+
+// Título y nombre del jugador (izquierda)
+        JLabel tituloJuego = new JLabel("🎯 Adivina Quién");
+        tituloJuego.setFont(new Font("Arial", Font.BOLD, 22));
+        tituloJuego.setForeground(Color.WHITE);
+        tituloJuego.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel labelNombreJugador = new JLabel("Jugador: " + nombreJugador);
+        labelNombreJugador.setFont(new Font("Arial", Font.BOLD, 16));
+        labelNombreJugador.setForeground(Color.WHITE);
+        labelNombreJugador.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel panelIzquierda = new JPanel();
+        panelIzquierda.setOpaque(false);
+        panelIzquierda.setLayout(new BoxLayout(panelIzquierda, BoxLayout.Y_AXIS));
+        panelIzquierda.add(tituloJuego);
+        panelIzquierda.add(labelNombreJugador);
+
+// Cronómetro (centro)
+        etiquetaCronometro = new JLabel("Tiempo: 00:00");
+        etiquetaCronometro.setFont(new Font("Arial", Font.BOLD, 16));
+        etiquetaCronometro.setForeground(Color.WHITE);
+        etiquetaCronometro.setHorizontalAlignment(SwingConstants.CENTER);
+
+// Personaje del jugador (derecha)
         JLabel labelPersonajeJugador = new JLabel();
         ImageIcon iconJugador = new ImageIcon(getClass().getResource("/Personajes/" + personajeJugador.getImagen()));
         Image imgJugador = iconJugador.getImage().getScaledInstance(100, 120, Image.SCALE_SMOOTH);
         labelPersonajeJugador.setIcon(new ImageIcon(imgJugador));
         labelPersonajeJugador.setBorder(BorderFactory.createTitledBorder("Tu personaje: " + personajeJugador.getNombre()));
-        panelSuperior.add(labelPersonajeJugador);
+
+// Agregar a panel superior
+        panelSuperior.add(panelIzquierda, BorderLayout.WEST);
+        panelSuperior.add(etiquetaCronometro, BorderLayout.CENTER);
+        panelSuperior.add(labelPersonajeJugador, BorderLayout.EAST);
+
         fondo.add(panelSuperior, BorderLayout.NORTH);
 
         setVisible(true);
+        iniciarCronometro();
+
+
     }
 
     private void enviarMensaje(String msg) {
@@ -149,6 +186,21 @@ public class TableroFrame extends JFrame implements SocketObserver {
             }
         }, 0, 1000);
     }
+    private void iniciarCronometro() {
+        cronometro = new Timer();
+        cronometro.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                segundosTranscurridos++;
+                int minutos = segundosTranscurridos / 60;
+                int segundos = segundosTranscurridos % 60;
+                String tiempoFormateado = String.format("Tiempo: %02d:%02d", minutos, segundos);
+                etiquetaCronometro.setText(tiempoFormateado);
+            }
+        }, 0, 1000);
+    }
+
+
     @Override
     public void onMensajeRecibido(String mensaje) {
         if (mensaje.startsWith("PERSONAJE_ELEGIDO:")) {
@@ -163,6 +215,8 @@ public class TableroFrame extends JFrame implements SocketObserver {
             if (intento.equalsIgnoreCase(personajeJugador.getNombre())) {
                 enviarMensaje("GANASTE:true");
                 areaMensajes.append("¡El oponente ha adivinado tu personaje!\n");
+                if (cronometro != null) cronometro.cancel();
+
 
                 SwingUtilities.invokeLater(() -> {
                     // Imagen del personaje del jugador
@@ -196,6 +250,8 @@ public class TableroFrame extends JFrame implements SocketObserver {
                 areaMensajes.append("¡Felicidades! Adivinaste el personaje del oponente. 🎉\n");
                 enviarMensaje("GANADOR:" + nombreJugador + "|" + personajeJugador.getNombre());
                 areaMensajes.append("El personaje enemigo era: " + personajeEnemigo.getNombre());
+                if (cronometro != null) cronometro.cancel();
+
                 int opcion = JOptionPane.showOptionDialog(
                         this,
                         "¿Quieres volver a jugar?",
